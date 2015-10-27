@@ -377,3 +377,12 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 			os.system('gdal_translate -of '+driver+' tmpLL.tif '+outrastername)
 		os.remove('tmpLL.tif')
 
+def main():
+	'''
+	runs tests for kdtools functions
+	'''
+	
+	return 0
+
+if __name__ == "__main__":
+	main()
