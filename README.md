@@ -1,7 +1,7 @@
-#KDtools
-##Kernel Density Estimation Tools
+# KDtools
+## Kernel Density Estimation Tools
 
-##DESCRIPTION
+## DESCRIPTION
 Kernel Density Estimation Tools
 
 Functions aid in creating a point density 
@@ -21,10 +21,10 @@ are found.
 ## AUTHOR
 Jacob Richardson (github.com/jarichardson)
 
-##REQUIREMENTS
+## REQUIREMENTS
 GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osgeo, time
 
-##FUNCTIONS
+## FUNCTIONS
 **reproject**(llcoors,planet="earth",utmzone=-999,clon=-999,inverse=False)
 	Reprojects long-lat data into transverse mercator coordinates
 	with units of meters. Optionally, set inverse=True to change
