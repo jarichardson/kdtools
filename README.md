@@ -33,7 +33,7 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 	      The density value of each contour decreases with increasing
 	      sigma.
 	
-	Requires a numpy array of density values (Z), with any shape.
+	Requires a numpy array of density values (*Z*), with any shape.
 	Optionally, provide a list of requested sigma thresholds, and the
 	grid size as a 2 item list, to normalize the density.
 	
@@ -46,16 +46,16 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 	Outputs a 2-D array to a gdal-readable raster. Input expected to be
 	in a transverse mercator projection.
 	
-	*griddata*: 2D data array
-	*outrastername*: file name of raster output. If meter output is desired,
-	                 it would be good practice to define clon or utm zone
-	*planet*:   'earth','venus', or 'mars'. This is only needed to 
-	            translate to latlong projections
-	*clon*:     center longitude of non-earth transverse mercator data
-	*utmzone*:  utm zone of earth data
-	*driver*:   gdal-readable raster short name [GTiff]
-	*outproj*:  'tm' or 'll' for transverse mercator (no tranformation
-	            occurs) or latlong (gdalwarp will be implemented). [tm]
+	griddata: 2D data array
+	outrastername - file name of raster output. If meter output is desired,
+	                it would be good practice to define clon or utm zone
+	planet        - 'earth','venus', or 'mars'. This is only needed to 
+	                translate to latlong projections
+	clon          - center longitude of non-earth transverse mercator data
+	utmzone       - utm zone of earth data
+	driver        - gdal-readable raster short name [GTiff]
+	outproj       - 'tm' or 'll' for transverse mercator (no tranformation
+	                occurs) or latlong (gdalwarp will be implemented). [tm]
 	   
 	ISSUES: If values are very low (normal for density grids), gdalwarp 
 	     doesn't work, so it is suggested that output remain in meters.
@@ -76,10 +76,10 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 **KD**(bd,coors,ranges,spacings):
 	
 	Estimates point density using:
-	*bd*       - a kernel bandwidth (2x2 covariance	matrix)
-	*coors*    - 2xN list of coordinates for N points.
-	*ranges*   - a 2x2 [[W,E],[S,N]] array
-	*spacings* - a 1x2 [X-resolution,Y-resolution] array
+	bd       - a kernel bandwidth (2x2 covariance	matrix)
+	coors    - 2xN list of coordinates for N points.
+	ranges   - a 2x2 [[W,E],[S,N]] array
+	spacings - a 1x2 [X-resolution,Y-resolution] array
 	
 	Outputs X,Y,D: Eastings, Northings, and Densities in a Meshgrid
 	format (i.e. X will be tiled, Y will be repeated)
