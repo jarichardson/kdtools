@@ -43,21 +43,21 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 		
 **densityToRaster**(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm")
 	
-	Outputs a 2-D array to a gdal-readable raster. Input expected to be
-	in a transverse mercator projection.
-	
-	*griddata*: 2D data array
-	*outrastername*: file name of raster output. If meter output is desired,
-	   it would be good practice to define clon or utm zone
-	*planet*:        'earth','venus', or 'mars'. This is only needed to translate to latlong projections
-	*clon*:          center longitude of non-earth transverse mercator data
-	*utmzone*:       utm zone of earth data
-	*driver*:        gdal-readable raster short name [GTiff]
-	*outproj*:       'tm' or 'll' for transverse mercator (no tranformation occurs) or latlong (gdalwarp will be implemented). [tm]
-	   
-	ISSUES: If values are very low (normal for density grids), gdalwarp 
-	     doesn't work, so it is suggested that output remain in meters.
-	     A workaround might be to supply log10 values of griddata.
+Outputs a 2-D array to a gdal-readable raster. Input expected to be
+in a transverse mercator projection.
+
+*griddata*: 2D data array
+*outrastername*: file name of raster output. If meter output is desired,
+   it would be good practice to define clon or utm zone
+*planet*:        'earth','venus', or 'mars'. This is only needed to translate to latlong projections
+*clon*:          center longitude of non-earth transverse mercator data
+*utmzone*:       utm zone of earth data
+*driver*:        gdal-readable raster short name [GTiff]
+*outproj*:       'tm' or 'll' for transverse mercator (no tranformation occurs) or latlong (gdalwarp will be implemented). [tm]
+   
+ISSUES: If values are very low (normal for density grids), gdalwarp 
+     doesn't work, so it is suggested that output remain in meters.
+     A workaround might be to supply log10 values of griddata.
 		
 **ellipseGen**(bd,eps=False,epsfilename='bandwidth_ellipse.eps')
 	
