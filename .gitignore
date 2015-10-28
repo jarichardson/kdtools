@@ -1,1 +1,6 @@
+*.pyc
+*.eps
+gmt.history
+.RData
+*.tif
 *~

@@ -19,11 +19,12 @@ are found.
 AUTHOR: Jacob Richardson (github.com/jarichardson)
 
 REQUIREMENTS: GMT, R with KS library, GDAL, PROJ.4,
-  and pylibs: pyproj, numpy, os, scipy, osgeo
+  and pylibs: pyproj, numpy, os, scipy, osgeo, time
 '''
 import pyproj
 import numpy
 import os
+import time
 import scipy.linalg as linalg
 from scipy.stats import norm
 from osgeo import gdal,osr
@@ -67,10 +68,10 @@ def reproject(llcoors,planet="earth",utmzone=-999,clon=-999,inverse=False):
 		return 0
 	
 	if inverse==True:
-		reproj = TransMerc(llcoors)
+		reproj = TransMerc(llcoors[:,0],llcoors[:,1])
 		mcoors = numpy.transpose(reproj)
 	else:
-		reproj = TransMerc(llcoors)
+		reproj = TransMerc(llcoors[:,0],llcoors[:,1])
 		mcoors = numpy.transpose(reproj)
 	
 	return mcoors
@@ -136,7 +137,7 @@ def samse_bandwidth(coords):
 	return bandwidth
 
 
-def KDE(bd,coors,ranges,spacings):
+def KD(bd,coors,ranges,spacings):
 	'''
 	Estimates point density using:
 	bd       - a kernel bandwidth (2x2 covariance	matrix)
@@ -148,11 +149,11 @@ def KDE(bd,coors,ranges,spacings):
 	format (i.e. X will be tiled, Y will be repeated)
 	'''
 	
-	ventct = len(coors)
 	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
 	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
 	
-	constant = 2.0*numpy.pi*detH*ventct
+	#constant variable in gaussian pdf
+	constant = 2.0*numpy.pi*detH*len(coors)
 
 	#define map grid
 	x = numpy.arange(ranges[0][0],(ranges[0][1]+spacings[0]),spacings[0])
@@ -166,8 +167,8 @@ def KDE(bd,coors,ranges,spacings):
 			for j,n in enumerate(y):
 				dx = e-v[0]
 				dy = n-v[1]
-				dxdy = numpy.dot(invH,numpy.array[[dx],[dy]])
-				dist[i][j] = numpy.dot(numpy.transpose(dxdy),dxdy)[0][0]
+				dxdy = numpy.dot(invH,numpy.array([[dx],[dy]]))
+				dist[j][i] = numpy.dot(numpy.transpose(dxdy),dxdy)[0][0]
 		D += numpy.exp(-0.5 * dist)
 	
 	D /= constant #normalize
@@ -189,59 +190,60 @@ def ellipseGen(bd,eps=False,epsfilename='bandwidth_ellipse.eps'):
 	'''
 	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
 	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
-	constant = 2.0*numpy.pi*detH*ventct
+	constant = 2.0*numpy.pi*detH
 	
 	radius = 20
 	angles = numpy.arange(0,numpy.pi,(numpy.pi/180.0))
 	D = numpy.zeros(len(angles))
 	
+	#simulate density in all directions
 	for i,phi in enumerate(angles):
-		dx = radius*cos(phi)
-		dy = radius*sin(phi)
-		dxdy = numpy.dot(invH,numpy.array[[dx],[dy]])
+		dx = radius*numpy.cos(phi)
+		dy = radius*numpy.sin(phi)
+		dxdy = numpy.dot(invH,numpy.array([[dx],[dy]]))
 		dist = numpy.dot(numpy.transpose(dxdy),dxdy)[0][0]
-		D[i] = numpy.exp(-0.5*dist)/(detH*constant)
+		D[i] = numpy.exp(-0.5*dist)/constant
 	
-	maxaz = az[numpy.where(D=max(D))]
-	minaz = az[numpy.where(D=min(D))]
+	#Find azimuth of greatest, least density
+	maxaz = angles[numpy.where(D==max(D))][0]
+	minaz = angles[numpy.where(D==min(D))][0]
 	
 	#Calculate Density at vent location
-	dxdy = numpy.dot(invH,numpy.array[[0],[0]])
+	dxdy = numpy.dot(invH,numpy.array([[0],[0]]))
 	dist = numpy.dot(numpy.transpose(dxdy),dxdy)[0][0]
-	ventD = numpy.exp(-0.5*dist)/(detH*constant)
+	ventD = numpy.exp(-0.5*dist)/constant
 	
 	#Calculate standard deviations
 	#For the major axis
-	majsd = (10*(2**0.5))/(-1*log(max(D)/ventD))**0.5 #(radius=20 units)
+	majsd = (10*(2**0.5))/(-1*numpy.log(max(D)/ventD))**0.5 #(radius=20 units)
 	majdir = 90-numpy.degrees(maxaz) #Gives direction from North. East is +
 	#For the minor axis
-	minsd = (10*(2**0.5))/(-1*log(min(D)/ventD))**0.5
+	minsd = (10*(2**0.5))/(-1*numpy.log(min(D)/ventD))**0.5
 	mindir = 90-numpy.degrees(minaz)
-		
-	print 'Quick check:'
-	print ('Density at vent             = %0.3e' % ventD)
-	print ('Theoretical density at vent = %0.3e' % (1/(2*numpy.pi*majsd*minsd)))
 
 	#Print out the results
+	'''
 	print '\nBandwidth Ellipse Information'
 	print 'major axis:'
-	print ('  degrees from north - %0.1f' % majdir)
+	print ('  degrees from north - %0.0f' % majdir)
 	print ('  standard deviation - %0.4f' % majsd)
 	print 'minor axis:'
-	print ('  degrees from north - %0.1f' % mindir)
+	print ('  degrees from north - %0.0f' % mindir)
 	print ('  standard deviation - %0.4f' % minsd)
+	'''
 	
 	if eps==True:
 		majaxis = 2*majsd
 		minaxis = 2*minsd
 		
 		with open('ellipseGMT.xy','w') as f:
-			f.write('0\t0\t%0.0f\t%0.4f\t%0.4f' % majdir, majaxis, minaxis)
-		os.system('psxy ellipseGMT.xy -SE -Wblack -JX6i -R-%0.4f/%0.4f/-%0.4f/%0.4f -Ba%0.4f -K >'+epsfilename % majaxis,majaxis,majaxis,majaxis,majsd)
+			f.write('0\t0\t%0.0f\t%0.4f\t%0.4f' % (majdir, majaxis, minaxis))
+		os.system(('psxy ellipseGMT.xy -SE -Wblack -JX6i -R%0.4f/%0.4f/%0.4f/%0.4f -Ba%0.4f -K >' % ((-1*majaxis),majaxis,(-1*majaxis),majaxis,majsd))+epsfilename)
 		os.remove('ellipseGMT.xy')			
 		print ('\nPlotted ellipse at '+epsfilename)
 		
-		return majdir,majsd,minsd
+	returnstats = [majdir,majsd,minsd]
+	return returnstats
 
 def contourBySigma(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3.0],gridspacings=[1,1]):
 	'''
@@ -261,23 +263,23 @@ def contourBySigma(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3
 	#find cumulative density that is used to pass the given
 	#sigma thresholds in "contours"
 	cum_thresholds = 2*(norm.cdf(sigmas)-norm.cdf(0))
-
+	
 	integrate = 0.0
 	curcontour = 0
 	densitycontours = {}
 	
 	#sort and reverse Z
 	Z = numpy.sort(Z,kind='quicksort',axis=None)[::-1]
-	#augment Z by grid spacing, assuming density units are m^-2, but
-	#spacing is not 1 cell m^-2
-	Z *= gridspacings[0]*gridspacings[1]
 	
-	for d in Z:
+	#assuming density units are m^-2, but spacing is not 1 cell m^-2
+	#reduce cumulative threshold by grid resolution
+	cum_thresholds *= 1.0/(gridspacings[0]*gridspacings[1])
+	
+	for i,d in enumerate(Z):
 		integrate+=d
 		#if the elapsed density surpasses the next contour
 		if (integrate >= cum_thresholds[curcontour]):
 			densitycontours[sigmas[curcontour]] = d
-			
 			curcontour += 1
 			if (curcontour>=len(sigmas)):
 				break
@@ -298,16 +300,36 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 	driver: gdal-readable raster short name [GTiff]
 	outproj: 'tm' or 'll' for transverse mercator (no tranformation occurs)
 	   or latlong (gdalwarp will be implemented). [tm]
+	   
+	ISSUES: If values are very low (normal for density grids), gdalwarp 
+	     doesn't work, so it is suggested that output remain in meters.
+	     A workaround might be to supply log10 values of griddata.
 	'''
 	
-	gdaldriver = gdal.GetDriverByName(driver)
-	driver.Register()
-	cols = numpy.shape(griddata)[0]
-	rows = numpy.shape(griddata)[1]
+	#print an extra line for good looks
+	print ""
+	
+	#Check that the user's requested driver will actually work before
+	#doing anything
+	userdriver = gdal.GetDriverByName(driver)
+	if userdriver==None:
+		print '\nerror: Raster type "'+driver+'" not a valid gdal driver!'
+		print '  No map created.'
+		return -1
+	
+	gdaldriver = gdal.GetDriverByName('GTiff')
+	gdaldriver.Register()
+	cols = numpy.shape(griddata)[1]
+	rows = numpy.shape(griddata)[0]
 	bands = 1
 	
+	griddata = griddata[::-1]
 	
 	dest_raster = gdaldriver.Create(outrastername, cols, rows, bands, gdal.GDT_Float64 )
+	#if dest_raster==None:
+	#	print '\nerror: gdal cannot currently create rasters of raster type "'+driver+'"! Don\'t blame the messenger.'
+	#	print '  No map created.'
+	#	return -1
 
 	#adfGeoTransform[0] /* top left x */
   #adfGeoTransform[1] /* w-e pixel resolution */
@@ -330,15 +352,21 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 		
 		if (planet == 'venus'):
 			srs.ImportFromProj4( '+proj=tmerc +lat_0=0 +lon_0='+str(clon)+' +k=0.9996 +x_0=0 +y_0=0 +a=6051800 +b=6051800 +units=m +no_defs' )
+			srs.SetProjCS( "Venus 2000 Sphere, Custom Meridian" )
+			srs.SetGeogCS( 'Venus 2000', 'D_Venus_2000', 'Venus_2000_IAU_IAG', 6051800.0, 0.0 )
 		
 		elif (planet == 'mars'):
 			srs.ImportFromProj4( '+proj=tmerc +lat_0=0 +lon_0='+str(clon)+' +k=0.9996 +x_0=0 +y_0=0 +a=3396190 +b=3396190 +units=m +no_defs' )
+			srs.SetProjCS( "Mars 2000 Sphere, Custom Meridian" )
+			srs.SetGeogCS( 'Mars 2000', 'D_Mars_2000', 'Mars_2000_IAU_IAG', 3396190.0, 169.89444722361179 )
 		else:
-			print 'error: clon set but planet is not venus or mars.'
+			print '\nwarning: clon set but planet is not venus or mars.'
+			print '  output raster will not have projection metadata'
 			return 0
 		dest_raster.SetProjection( srs.ExportToWkt() )
 	
 	dest_raster.GetRasterBand(1).WriteArray( griddata )
+	dest_raster = None
 	
 	#warp to ll if necessary
 	if outproj=='ll':
@@ -350,7 +378,7 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 				return 0
 			
 			#reproject the transverse mercator grid
-			os.system('gdalwarp -t_srs "+proj=longlat +datum=WGS84" '+outrastername+' tmpLL.tif')
+			os.system('gdalwarp -r cubic -t_srs "+proj=longlat +datum=WGS84" '+outrastername+' tmpLL.tif')
 			
 		#if not earth, catch invalid center_lon
 		elif ((clon<-360) or (clon>360)):
@@ -368,21 +396,136 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 				return 0
 			
 			#reproject the transverse mercator grid
-			os.system('gdalwarp -t_srs "+proj=longlat +k=0.9996 +x_0=0 +y_0=0 +a='+radius+' +b='+radius+' +no_defs" '+outrastername+' tmpLL.tif')
+			os.system('gdalwarp -r cubic -t_srs "+proj=longlat +k=0.9996 +x_0=0 +y_0=0 +a='+radius+' +b='+radius+' +no_defs" '+outrastername+' tmpLL.tif')
 			
 		#overwrite the transverse meter raster with the longlat raster file
 		if driver=='GTiff':
 			os.system('mv tmpLL.tif '+outrastername)
 		else:
 			os.system('gdal_translate -of '+driver+' tmpLL.tif '+outrastername)
-		os.remove('tmpLL.tif')
-
-def main():
-	'''
-	runs tests for kdtools functions
-	'''
+			os.remove('tmpLL.tif')
+	
+	#If output is in meters, but user wants a non-Tiff, change format here
+	elif driver!='GTiff':
+		os.system('gdal_translate -of '+driver+' '+outrastername+' tmpM.tif')
+		os.system('mv tmpM.tif '+outrastername)
+	
+	if os.path.isfile('tmpM.aux.xml'):
+		os.remove('tmpM.aux.xml')
+	if os.path.isfile('tmpLL.aux.xml'):
+		os.remove('tmpLL.aux.xml')
+	if os.path.isfile(outrastername+'.aux.xml'):
+		os.remove(outrastername+'.aux.xml')
 	
 	return 0
+	
+	
+	
+	
+	#######                                         #########
+             #################################	
+#############################################################	
+	#~~                MAIN TEST FUNCTION                ~~#
+#############################################################	
+def main():
+	'''
+	runs tests for kdtools functions using a synthetic dataset
+	some tests are visual and require matplotlib
+	'''
+	import matplotlib.pyplot as plt
+	from matplotlib.ticker import LogFormatter 
+	
+	#create a random synthetic dataset of points
+	data = numpy.random.uniform(31,35,[50,2])
+	data[:,1] *= 1.3 #stretch data in the N-S direction
+	zone = 36   #utm zone on earth for this lat-long
+	clon = 33.0 #center longitude of data on other planets
+	
+	print "\nsynthetic dataset info"
+	print "  %d points on an x,y grid" % len(data)
+	print "  x min,mean,max - %0.3f, %0.3f, %0.3f" % (min(data[:,0]),(sum(data[:,0])/len(data)),max(data[:,0]))
+	print "  y min,mean,max - %0.3f, %0.3f, %0.3f" % (min(data[:,1]),(sum(data[:,1])/len(data)),max(data[:,1]))
+	
+	#create grid matrix
+	gridresolution = [10000,10000]
+	
+	'''
+	functions:
+	KD(bd, coors, ranges, spacings)
+	contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridspacings=[1, 1])
+	densityToRaster(griddata, ranges, spacings, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
+	ellipseGen(bd, eps=False, epsfilename='bandwidth_ellipse.eps')
+	rangeBuffer(coords, B=0)
+	reproject(llcoors, planet='earth', utmzone=-999, clon=-999, inverse=False)
+	'''
+	#1. reproject(llcoors, planet='earth', utmzone=-999, clon=-999, inverse=False)
+	data = reproject(data,planet='mars',clon=clon)
+	print "\nReprojected synthetic dataset info"
+	print "  %d points on an x,y grid" % len(data)
+	print "  x min,mean,max - %0.3f, %0.3f, %0.3f" % (min(data[:,0]),(sum(data[:,0])/len(data)),max(data[:,0]))
+	print "  y min,mean,max - %0.3f, %0.3f, %0.3f" % (min(data[:,1]),(sum(data[:,1])/len(data)),max(data[:,1]))
+	
+	#2. rangeBuffer(coords, B=0)
+	datarange = rangeBuffer(data,B=30)
+	print "\ndata range with 30% buffer:\n", datarange
+	
+	#3. samse_bandwidth(coords)
+	bandwidth = samse_bandwidth(data)
+	print "\nsamse bandwidth:\n", bandwidth
+	
 
+	#4. ellipseGen(bd, eps=False, epsfilename='bandwidth_ellipse.eps')
+	ellipse_stats = ellipseGen(bandwidth, eps=True)
+	print "\nellipse stats:"
+	print "  ellipse major axis orientation (deg N) - ", ellipse_stats[0]
+	print "  ellipse major axis standard deviation  - ", ellipse_stats[1]
+	print "  ellipse minor axis standard deviation  - ", ellipse_stats[2]
+	
+	#5. KD(bd, coors, ranges, spacings)
+	print "\nCalculating Density on grid..."
+	(X,Y,D) = KD(bandwidth, data, datarange, gridresolution)
+	
+	integrateddensity = numpy.sum(D)*gridresolution[0]*gridresolution[1]
+	print ("  Total Density within grid - %0.3f%%" % (integrateddensity*100))
+	print ("  Maximum Density on grid   - %0.3e pts/sq. unit area" % numpy.amax(D))
+		
+	
+	#6. contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridspacings=[1, 1])
+	contours = contourBySigma(D, sigmas=[0.5,1,2], gridspacings=gridresolution)
+	print "\nDensity value contours at"
+	print "  0.5-sigma: %0.3e sq. unit area^-1" % contours[0.5]
+	print "    1-sigma: %0.3e" % contours[1]
+	print "    2-sigma: %0.3e" % contours[2]
+	
+	
+	#7. densityToRaster(griddata, ranges, spacings, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
+	gdalerr = densityToRaster(numpy.log10(D), datarange, gridresolution, 'synth.grd', clon=clon, planet='mars', outproj='ll', driver="GMT")
+	if gdalerr != -1:
+		print "\nOutput test raster to synth.tif"
+	
+	#8. Plot the results
+	print "\nPlotting Density map with points"
+	plt.clf()
+	plt.subplot(1, 1, 1)
+	plt.title('test density (points per square unit)')
+	# set the limits of the plot to the limits of the data
+	plt.axis([datarange[0][0], datarange[0][1], datarange[1][0], datarange[1][1]])
+		
+	#Color plot of the density data from KD
+	plt.pcolor(X, Y, D, cmap='YlOrRd', vmin=0, vmax=numpy.amax(D))
+	#format the color bar labels to log scale
+	formatter = LogFormatter(10, labelOnlyBase=False) 
+	plt.colorbar(format=formatter)
+	
+	#Contour plot from contourBySigma
+	contourlevels = [contours[0.5],contours[1],contours[2]]
+	CS = plt.contour(X,Y,D,contourlevels,colors='k')
+	plt.clabel(CS, fontsize=9, inline=1, fmt=formatter)
+	
+	#Scatter Plot of synthetic dataset
+	plt.scatter(data[:,0],data[:,1],c='k',marker='.')
+	plt.show()
+	
+	
 if __name__ == "__main__":
 	main()
