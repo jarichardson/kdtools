@@ -19,12 +19,11 @@ are found.
 AUTHOR: Jacob Richardson (github.com/jarichardson)
 
 REQUIREMENTS: GMT, R with KS library, GDAL, PROJ.4,
-  and pylibs: pyproj, numpy, os, scipy, osgeo, time
+  and pylibs: pyproj, numpy, os, scipy, osgeo
 '''
 import pyproj
 import numpy
 import os
-import time
 import scipy.linalg as linalg
 from scipy.stats import norm
 from osgeo import gdal,osr

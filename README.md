@@ -26,7 +26,6 @@ Jacob Richardson (github.com/jarichardson)
 	* pyproj
 	* numpy
 	* os
-	* time
 	* osgeo
 	* matplotlib - For **main** (test) function
 * PROJ.4	- For **reproject** and **densityToRaster**
