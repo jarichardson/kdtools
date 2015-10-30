@@ -28,12 +28,12 @@ Jacob Richardson (github.com/jarichardson)
 	* os
 	* time
 	* osgeo
-	* matplotlib - For main (test) function
-* PROJ.4	- For reproject, densityToRaster functions
-* GDAL	- For densityToRaster
-* R	- For samse_bandwidth function
+	* matplotlib - For **main** (test) function
+* PROJ.4	- For **reproject** and **densityToRaster**
+* GDAL	- For **densityToRaster**
+* R	- For **samse_bandwidth**
 	* Also requires the KS library in R. See [Installing KS Library Section](#installing-ks-library-in-r) below.
-* GMT	-For ellipseGen function
+* GMT	- For **ellipseGen** function
 
 ## FUNCTIONS
 **contourBySigma**(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3.0],gridspacings=[1,1])
