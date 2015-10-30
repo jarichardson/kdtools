@@ -22,7 +22,18 @@ are found.
 Jacob Richardson (github.com/jarichardson)
 
 ## REQUIREMENTS
-GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osgeo, time
+* Python Libraries: 
+	* pyproj
+	* numpy
+	* os
+	* time
+	* osgeo
+	* matplotlib - For main (test) function
+* PROJ.4	- For reproject, densityToRaster functions
+* GDAL	- For densityToRaster
+* R	- For samse_bandwidth function
+	* Also requires the KS library in R. See [Installing KS Library Section](#installing-ks-library-in-r) below.
+* GMT	-For ellipseGen function
 
 ## FUNCTIONS
 **contourBySigma**(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3.0],gridspacings=[1,1])
@@ -80,6 +91,7 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 	coors    - 2xN list of coordinates for N points.
 	ranges   - a 2x2 [[W,E],[S,N]] array
 	spacings - a 1x2 [X-resolution,Y-resolution] array
+	weights  - a 2xN list of weights for N points (default: empty [])
 	
 	Outputs X,Y,D: Eastings, Northings, and Densities in a Meshgrid
 	format (i.e. X will be tiled, Y will be repeated)
@@ -125,3 +137,32 @@ GMT, R with KS library, GDAL, PROJ.4, and pylibs: pyproj, numpy, os, scipy, osge
 	Evaluates the SAMSE Kernel in R using a coordinate list (coords).
 	Returns 2x2 bandwidth covariance matrix.
 	Requires: R, KS library in R.
+	
+## INSTALLING KS LIBRARY IN R
+
+To install ks in R on a unix machine, you will need the following programs installed:
+
+* R-base
+* R-base-devel
+* Mesa
+* Mesa-devel
+* gcc
+* gcc-fortran
+* libpng14-devel
+* libpng12-devel
+* libpng12-compat-devel
+* possibly others depending on the errors given while installing packages in R.
+
+Then in R (in superuser), run:
+
+	install.packages("ks")
+
+and choose a mirror. The KS package requires other packages:
+* rgl
+* mvtnorm
+
+If the above utilities are installed, these two packages should install easily.
+If the two packages are installed, KS should install easily. 
+To check KS installation, run (in R, out of superuser)
+
+	library(ks)
