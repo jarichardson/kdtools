@@ -125,6 +125,13 @@ def samse_bandwidth(coords):
 	#command to run the batch file
 	os.system('R CMD BATCH samse_batch.r')
 	
+	#check for output file doesn't exist, fail
+	if not os.path.isfile(bandwidthfile):
+		print "error: Output from R was not successful."
+		print "    Is R and the KS library installed?"
+		return []
+	
+	
 	#Extract the bandwidth matrix from the bandwidth txt file
 	bandwidth = numpy.loadtxt(bandwidthfile,skiprows=1,usecols=(1,2))
 	
@@ -137,23 +144,36 @@ def samse_bandwidth(coords):
 	return bandwidth
 
 
-def KD(bd,coors,ranges,spacings):
+def KD(bd,coors,ranges,spacings,weights=[]):
 	'''
 	Estimates point density using:
 	bd       - a kernel bandwidth (2x2 covariance	matrix)
 	coors    - 2xN list of coordinates for N points.
 	ranges   - a 2x2 [[W,E],[S,N]] array
 	spacings - a 1x2 [X-resolution,Y-resolution] array
+	weights  - a 2xN list of wieghts for N points [None]
 	
 	Outputs X,Y,D: Eastings, Northings, and Densities in a Meshgrid
 	format (i.e. X will be tiled, Y will be repeated)
 	'''
 	
+	#If weights are given, test to see that they're valid
+	if weights != []:
+		if numpy.shape(weights)[0] != numpy.shape(coors)[0]:
+			print "error: weight array not same length as coordinate array!"
+			print "  cannot create kernel density map."
+			return None
+	#If weights are not given, make weights even across the board
+	else:
+		weights = numpy.ones(len(coors))
+	
+	weightaverage = numpy.sum(weights)/len(weights)
+	
 	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
 	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
 	
 	#constant variable in gaussian pdf
-	constant = 2.0*numpy.pi*detH*len(coors)
+	constant = 2.0*numpy.pi*detH*len(coors) * weightaverage
 
 	#define map grid
 	x = numpy.arange(ranges[0][0],(ranges[0][1]+spacings[0]),spacings[0])
@@ -162,14 +182,15 @@ def KD(bd,coors,ranges,spacings):
 	D = numpy.zeros(numpy.shape(X)) #Density Grid
 	dist = numpy.zeros(numpy.shape(X)) #distance matrix grid
 	
-	for v in coors:
+	#Three for loop with enumerates... Nick Voss would be proud.
+	for w,v in enumerate(coors):
 		for i,e in enumerate(x):
 			for j,n in enumerate(y):
 				dx = e-v[0]
 				dy = n-v[1]
 				dxdy = numpy.dot(invH,numpy.array([[dx],[dy]]))
 				dist[j][i] = numpy.dot(numpy.transpose(dxdy),dxdy)[0][0]
-		D += numpy.exp(-0.5 * dist)
+		D += numpy.exp(-0.5 * dist) * weights[w]
 	
 	D /= constant #normalize
 	
@@ -315,7 +336,7 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 	if userdriver==None:
 		print '\nerror: Raster type "'+driver+'" not a valid gdal driver!'
 		print '  No map created.'
-		return -1
+		return None
 	
 	gdaldriver = gdal.GetDriverByName('GTiff')
 	gdaldriver.Register()
@@ -329,7 +350,7 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 	#if dest_raster==None:
 	#	print '\nerror: gdal cannot currently create rasters of raster type "'+driver+'"! Don\'t blame the messenger.'
 	#	print '  No map created.'
-	#	return -1
+	#	return None
 
 	#adfGeoTransform[0] /* top left x */
   #adfGeoTransform[1] /* w-e pixel resolution */
@@ -362,7 +383,7 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
 		else:
 			print '\nwarning: clon set but planet is not venus or mars.'
 			print '  output raster will not have projection metadata'
-			return 0
+			#return 0
 		dest_raster.SetProjection( srs.ExportToWkt() )
 	
 	dest_raster.GetRasterBand(1).WriteArray( griddata )
@@ -437,9 +458,22 @@ def main():
 	
 	#create a random synthetic dataset of points
 	data = numpy.random.uniform(31,35,[50,2])
+	
+	#or create a grid of synthetic points
+	#data = numpy.zeros([100,2])
+	#data_easts  = numpy.linspace(31,35,10)
+	#data_norths = numpy.linspace(31,35,10)
+	#E, N = numpy.meshgrid(data_easts,data_norths)
+	#data[:,0] = E.reshape((100))
+	#data[:,1] = N.reshape((100))
+	
 	data[:,1] *= 1.3 #stretch data in the N-S direction
 	zone = 36   #utm zone on earth for this lat-long
 	clon = 33.0 #center longitude of data on other planets
+	
+	#random synthetic weights
+	weights = numpy.random.uniform(1,20,len(data))
+	#weights = numpy.linspace(1,20,len(data)) #this puts the weights in order
 	
 	print "\nsynthetic dataset info"
 	print "  %d points on an x,y grid" % len(data)
@@ -471,6 +505,9 @@ def main():
 	
 	#3. samse_bandwidth(coords)
 	bandwidth = samse_bandwidth(data)
+	if len(bandwidth) == 0:
+		print "samse_bandwidth returned an error"
+		return None
 	print "\nsamse bandwidth:\n", bandwidth
 	
 
@@ -483,11 +520,11 @@ def main():
 	
 	#5. KD(bd, coors, ranges, spacings)
 	print "\nCalculating Density on grid..."
-	(X,Y,D) = KD(bandwidth, data, datarange, gridresolution)
+	(X,Y,D) = KD(bandwidth, data, datarange, gridresolution, weights=weights)
 	
 	integrateddensity = numpy.sum(D)*gridresolution[0]*gridresolution[1]
 	print ("  Total Density within grid - %0.3f%%" % (integrateddensity*100))
-	print ("  Maximum Density on grid   - %0.3e pts/sq. unit area" % numpy.amax(D))
+	print ("  Maximum Density on grid   - %0.3e sq. unit area^-1" % numpy.amax(D))
 		
 	
 	#6. contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridspacings=[1, 1])
@@ -510,7 +547,7 @@ def main():
 	plt.title('test density (points per square unit)')
 	# set the limits of the plot to the limits of the data
 	plt.axis([datarange[0][0], datarange[0][1], datarange[1][0], datarange[1][1]])
-		
+	
 	#Color plot of the density data from KD
 	plt.pcolor(X, Y, D, cmap='YlOrRd', vmin=0, vmax=numpy.amax(D))
 	#format the color bar labels to log scale
@@ -523,7 +560,7 @@ def main():
 	plt.clabel(CS, fontsize=9, inline=1, fmt=formatter)
 	
 	#Scatter Plot of synthetic dataset
-	plt.scatter(data[:,0],data[:,1],c='k',marker='.')
+	plt.scatter(data[:,0],data[:,1],c='k',s=(weights**2),marker='.')
 	plt.show()
 	
 	
