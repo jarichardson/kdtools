@@ -20,6 +20,16 @@ AUTHOR: Jacob Richardson (github.com/jarichardson)
 
 REQUIREMENTS: GMT, R with KS library, GDAL, PROJ.4,
   and pylibs: pyproj, numpy, os, scipy, osgeo
+
+Functions can be run in this order:
+1: import your data and the weights for your data into 2xN and 1xN arrays
+2: reproject(): Reproject your data into a transverse mercator projection with meter units
+3: rangeBuffer(): Find the range for your data and buffer that range to make a good density map.
+4. samse_bandwidth(): Use R and to find the SAMSE Kernel Bandwidth of your data
+5. ellipseGen(): get statistics of the ellipse described by the Bandwidth and draw the ellipse to an eps file
+6. KD(): Evaluate the point density for all locations in a grid around your data
+7. contourBySigma(): Find density levels that correspond to sigma-contours of the density map
+8. densityToRaster(): Save your density map as a GDAL-readable raster format!
 '''
 import pyproj
 import numpy
