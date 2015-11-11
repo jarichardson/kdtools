@@ -217,6 +217,12 @@ def ellipseGen(bd,eps=False,epsfilename='bandwidth_ellipse.eps'):
 	
 	Outputs major-axis direction, major-axis standard deviation, and
 	        minor-axis standard-deviation.
+	        
+	GMT can plot the ellipse using:
+	  'ell.dat' = 
+			0 0 major-dir major-axis minor-axis
+			
+	  'psxy ell.dat -SE -J* -R* > ell.eps' supply J and R.
 	'''
 	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
 	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
