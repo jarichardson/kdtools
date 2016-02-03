@@ -1,7 +1,7 @@
 #!/usr/bin/python
 '''
 Kernel Density Estimation Tools
-
+D=###
 Functions aid in creating a point density 
 distribution using Kernel Density Estimation.
 An optimized kernel bandwidth  is calculated in R
@@ -39,7 +39,7 @@ from scipy.stats import norm
 from osgeo import gdal,osr
 
 #REPROJECT
-def reproject(llcoors,planet="earth",utmzone=-999,clon=-999,inverse=False):
+def reproject(llcoords,planet="earth",utmzone=-999,clon=-999,inverse=False):
 	'''
 	Reprojects long-lat data into transverse mercator coordinates
 	with units of meters. Optionally, set inverse=True to change
@@ -77,13 +77,13 @@ def reproject(llcoors,planet="earth",utmzone=-999,clon=-999,inverse=False):
 		return 0
 	
 	if inverse==True:
-		reproj = TransMerc(llcoors[:,0],llcoors[:,1])
-		mcoors = numpy.transpose(reproj)
+		reproj = TransMerc(llcoords[:,0],llcoords[:,1])
+		mcoords = numpy.transpose(reproj)
 	else:
-		reproj = TransMerc(llcoors[:,0],llcoors[:,1])
-		mcoors = numpy.transpose(reproj)
+		reproj = TransMerc(llcoords[:,0],llcoords[:,1])
+		mcoords = numpy.transpose(reproj)
 	
-	return mcoors
+	return mcoords
 
 #FIND A BUFFERED RANGE OF N-DIMENSIONAL DATA
 def rangeBuffer(coords,B=0):
@@ -153,14 +153,14 @@ def samse_bandwidth(coords):
 	return bandwidth
 
 
-def KD(bd,coors,ranges,spacings,weights=[]):
+def KD(bandwidth,coords,gridRange,gridRes,weights=[]):
 	'''
 	Estimates point density using:
-	bd       - a kernel bandwidth (2x2 covariance	matrix)
-	coors    - 2xN list of coordinates for N points.
-	ranges   - a 2x2 [[W,E],[S,N]] array
-	spacings - a 1x2 [X-resolution,Y-resolution] array
-	weights  - a 2xN list of wieghts for N points [None]
+	bandwidth - a kernel bandwidth (2x2 covariance	matrix)
+	coords    - 2xN list of coordinates for N points.
+	gridRange    - a 2x2 [[W,E],[S,N]] array
+	gridRes  - a 1x2 [X-resolution,Y-resolution] array
+	weights   - a 2xN list of wieghts for N points [None]
 	
 	Outputs X,Y,D: Eastings, Northings, and Densities in a Meshgrid
 	format (i.e. X will be tiled, Y will be repeated)
@@ -168,31 +168,31 @@ def KD(bd,coors,ranges,spacings,weights=[]):
 	
 	#If weights are given, test to see that they're valid
 	if weights != []:
-		if numpy.shape(weights)[0] != numpy.shape(coors)[0]:
+		if numpy.shape(weights)[0] != numpy.shape(coords)[0]:
 			print "error: weight array not same length as coordinate array!"
 			print "  cannot create kernel density map."
 			return None
 	#If weights are not given, make weights even across the board
 	else:
-		weights = numpy.ones(len(coors))
+		weights = numpy.ones(len(coords))
 	
 	weightaverage = numpy.sum(weights)/len(weights)
 	
-	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
-	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
+	detH = linalg.det(linalg.sqrtm(bandwidth)) #determinate sqrt bandwidth
+	invH = linalg.inv(linalg.sqrtm(bandwidth)) #inverse sqrt bandwidth
 	
 	#constant variable in gaussian pdf
-	constant = 2.0*numpy.pi*detH*len(coors) * weightaverage
+	constant = 2.0*numpy.pi*detH*len(coords) * weightaverage
 
 	#define map grid
-	x = numpy.arange(ranges[0][0],(ranges[0][1]+spacings[0]),spacings[0])
-	y = numpy.arange(ranges[1][0],(ranges[1][1]+spacings[1]),spacings[1])
+	x = numpy.arange(gridRange[0][0],(gridRange[0][1]+gridRes[0]),gridRes[0])
+	y = numpy.arange(gridRange[1][0],(gridRange[1][1]+gridRes[1]),gridRes[1])
 	X,Y = numpy.meshgrid(x,y)	#X and Y are now tiled to grid
 	D = numpy.zeros(numpy.shape(X)) #Density Grid
 	dist = numpy.zeros(numpy.shape(X)) #distance matrix grid
 	
 	#Three for loop with enumerates... Nick Voss would be proud.
-	for w,v in enumerate(coors):
+	for w,v in enumerate(coords):
 		for i,e in enumerate(x):
 			for j,n in enumerate(y):
 				dx = e-v[0]
@@ -206,7 +206,7 @@ def KD(bd,coors,ranges,spacings,weights=[]):
 	return X,Y,D
 	
 
-def ellipseGen(bd,eps=False,epsfilename='bandwidth_ellipse.eps'):
+def ellipseGen(bandwidth,eps=False,epsfilename='bandwidth_ellipse.eps'):
 	'''
 	Identifies the major and minor axes directions and standard
 	deviations of a Gaussian ellipse defined by a 2x2 covariance
@@ -224,8 +224,8 @@ def ellipseGen(bd,eps=False,epsfilename='bandwidth_ellipse.eps'):
 			
 	  'psxy ell.dat -SE -J* -R* > ell.eps' supply J and R.
 	'''
-	detH = linalg.det(linalg.sqrtm(bd)) #determinate sqrt bandwidth
-	invH = linalg.inv(linalg.sqrtm(bd)) #inverse sqrt bandwidth
+	detH = linalg.det(linalg.sqrtm(bandwidth)) #determinate sqrt bandwidth
+	invH = linalg.inv(linalg.sqrtm(bandwidth)) #inverse sqrt bandwidth
 	constant = 2.0*numpy.pi*detH
 	
 	radius = 20
@@ -281,7 +281,7 @@ def ellipseGen(bd,eps=False,epsfilename='bandwidth_ellipse.eps'):
 	returnstats = [majdir,majsd,minsd]
 	return returnstats
 
-def contourBySigma(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3.0],gridspacings=[1,1]):
+def contourBySigma(Z,sigmas=[1.0,2.0,3.0],gridRes=[1,1]):
 	'''
 	Identifies Density contour levels given Sigma thresholds.
 	Contours define areas within which lay X% of the total field density
@@ -309,7 +309,7 @@ def contourBySigma(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3
 	
 	#assuming density units are m^-2, but spacing is not 1 cell m^-2
 	#reduce cumulative threshold by grid resolution
-	cum_thresholds *= 1.0/(gridspacings[0]*gridspacings[1])
+	cum_thresholds *= 1.0/(gridRes[0]*gridRes[1])
 	
 	for i,d in enumerate(Z):
 		integrate+=d
@@ -322,7 +322,7 @@ def contourBySigma(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3
 	
 	return densitycontours
 
-def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm"):
+def densityToRaster(griddata,gridRange,gridRes,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm"):
 	'''
 	Outputs a 2-D array to a gdal-readable raster. Input expected to be
 	in a transverse mercator projection.
@@ -373,7 +373,7 @@ def densityToRaster(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-99
   #adfGeoTransform[3] /* top left y */
   #adfGeoTransform[4] /* rotation, 0 if image is "north up" */
   #adfGeoTransform[5] /* n-s pixel resolution */	
-	geotrans = [ranges[0][0],spacings[0],0,ranges[1][1],0,(-1*spacings[1])]
+	geotrans = [gridRange[0][0],gridRes[0],0,gridRange[1][1],0,(-1*gridRes[1])]
 	dest_raster.SetGeoTransform(geotrans)
 	
 	#set transverse mercator projection
@@ -500,14 +500,14 @@ def main():
 	
 	'''
 	functions:
-	KD(bd, coors, ranges, spacings)
-	contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridspacings=[1, 1])
-	densityToRaster(griddata, ranges, spacings, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
-	ellipseGen(bd, eps=False, epsfilename='bandwidth_ellipse.eps')
+	KD(bandwidth, coords, gridRange, gridRes)
+	contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridRes=[1, 1])
+	densityToRaster(griddata, gridRange, gridRes, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
+	ellipseGen(bandwidth, eps=False, epsfilename='bandwidth_ellipse.eps')
 	rangeBuffer(coords, B=0)
-	reproject(llcoors, planet='earth', utmzone=-999, clon=-999, inverse=False)
+	reproject(llcoords, planet='earth', utmzone=-999, clon=-999, inverse=False)
 	'''
-	#1. reproject(llcoors, planet='earth', utmzone=-999, clon=-999, inverse=False)
+	#1. reproject(llcoords, planet='earth', utmzone=-999, clon=-999, inverse=False)
 	data = reproject(data,planet='mars',clon=clon)
 	print "\nReprojected synthetic dataset info"
 	print "  %d points on an x,y grid" % len(data)
@@ -526,14 +526,14 @@ def main():
 	print "\nsamse bandwidth:\n", bandwidth
 	
 
-	#4. ellipseGen(bd, eps=False, epsfilename='bandwidth_ellipse.eps')
+	#4. ellipseGen(bandwidth, eps=False, epsfilename='bandwidth_ellipse.eps')
 	ellipse_stats = ellipseGen(bandwidth, eps=True)
 	print "\nellipse stats:"
 	print "  ellipse major axis orientation (deg N) - ", ellipse_stats[0]
 	print "  ellipse major axis standard deviation  - ", ellipse_stats[1]
 	print "  ellipse minor axis standard deviation  - ", ellipse_stats[2]
 	
-	#5. KD(bd, coors, ranges, spacings)
+	#5. KD(bandwidth, coords, gridRange, gridRes)
 	print "\nCalculating Density on grid..."
 	(X,Y,D) = KD(bandwidth, data, datarange, gridresolution, weights=weights)
 	
@@ -542,18 +542,18 @@ def main():
 	print ("  Maximum Density on grid   - %0.3e sq. unit area^-1" % numpy.amax(D))
 		
 	
-	#6. contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridspacings=[1, 1])
-	contours = contourBySigma(D, sigmas=[0.5,1,2], gridspacings=gridresolution)
+	#6. contourBySigma(Z, sigmas=[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0], gridRes=[1, 1])
+	contours = contourBySigma(D, sigmas=[0.5,1,2], gridRes=gridresolution)
 	print "\nDensity value contours at"
 	print "  0.5-sigma: %0.3e sq. unit area^-1" % contours[0.5]
 	print "    1-sigma: %0.3e" % contours[1]
 	print "    2-sigma: %0.3e" % contours[2]
 	
 	
-	#7. densityToRaster(griddata, ranges, spacings, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
+	#7. densityToRaster(griddata, gridRange, gridRes, outrastername, clon=-999, utmzone=-999, planet='earth', driver='GTiff', outproj='tm')
 	gdalerr = densityToRaster(numpy.log10(D), datarange, gridresolution, 'synth.grd', clon=clon, planet='mars', outproj='ll', driver="GMT")
 	if gdalerr != -1:
-		print "\nOutput test raster to synth.tif"
+		print "\nOutput test raster to synth.grd"
 	
 	#8. Plot the results
 	print "\nPlotting Density map with points"
@@ -570,7 +570,7 @@ def main():
 	plt.colorbar(format=formatter)
 	
 	#Contour plot from contourBySigma
-	contourlevels = [contours[0.5],contours[1],contours[2]]
+	contourlevels = [contours[2],contours[1],contours[0.5]]
 	CS = plt.contour(X,Y,D,contourlevels,colors='k')
 	plt.clabel(CS, fontsize=9, inline=1, fmt=formatter)
 	

@@ -35,7 +35,7 @@ Jacob Richardson (github.com/jarichardson)
 * GMT	- For **ellipseGen** function
 
 ## FUNCTIONS
-**contourBySigma**(Z,sigmas=[0.25,0.5,0.75,1.0,1.25,1.5,1.75,2.0,2.25,2.5,2.75,3.0],gridspacings=[1,1])
+**contourBySigma**(Z,sigmas=[1.0,2.0,3.0],gridRes=[1,1])
 	
 	Identifies Density contour levels given Sigma thresholds.
 	Contours define areas within which lay X% of the total field density
@@ -51,7 +51,7 @@ Jacob Richardson (github.com/jarichardson)
 	are not found (off the grid if the grid is too small), they will not
 	be included in the dictionary.
 		
-**densityToRaster**(griddata,ranges,spacings,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm")
+**densityToRaster**(griddata,range,gridRes,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm")
 	
 	Outputs a 2-D array to a gdal-readable raster. Input expected to be
 	in a transverse mercator projection.
@@ -71,7 +71,7 @@ Jacob Richardson (github.com/jarichardson)
 	     doesn't work, so it is suggested that output remain in meters.
 	     A workaround might be to supply log10 values of griddata.
 		
-**ellipseGen**(bd,eps=False,epsfilename='bandwidth_ellipse.eps')
+**ellipseGen**(bandwidth,eps=False,epsfilename='bandwidth_ellipse.eps')
 	
 	Identifies the major and minor axes directions and standard
 	deviations of a Gaussian ellipse defined by a 2x2 covariance
@@ -83,14 +83,14 @@ Jacob Richardson (github.com/jarichardson)
 	Outputs major-axis direction, major-axis standard deviation, and
 	        minor-axis standard-deviation.
 	
-**KD**(bd,coors,ranges,spacings):
+**KD**(bandwidth,coords,gridRange,gridRes):
 	
 	Estimates point density using:
-	bd       - a kernel bandwidth (2x2 covariance	matrix)
-	coors    - 2xN list of coordinates for N points.
-	ranges   - a 2x2 [[W,E],[S,N]] array
-	spacings - a 1x2 [X-resolution,Y-resolution] array
-	weights  - a 2xN list of weights for N points (default: empty [])
+	bandwidth - a kernel bandwidth (2x2 covariance matrix)
+	coords    - 2xN list of coordinates for N points.
+	gridRange - a 2x2 [[W,E],[S,N]] array
+	spacings  - a 1x2 [X-resolution,Y-resolution] array
+	weights   - a 2xN list of weights for N points (default: empty [])
 	
 	Outputs X,Y,D: Eastings, Northings, and Densities in a Meshgrid
 	format (i.e. X will be tiled, Y will be repeated)
@@ -108,13 +108,13 @@ Jacob Richardson (github.com/jarichardson)
 	columns 1 and 2, respectively.
 	
 	ex: 
-	data         range output
+	coords       range output
 	[[1,5],      [[0,2],
 	 [2,5],  =>   [4,9]]
 	 [0,4],
 	 [1,9]]
 	
-**reproject**(llcoors,planet="earth",utmzone=-999,clon=-999,inverse=False)
+**reproject**(llcoords,planet="earth",utmzone=-999,clon=-999,inverse=False)
 	
 	Reprojects long-lat data into transverse mercator coordinates
 	with units of meters. Optionally, set *inverse*=True to change
