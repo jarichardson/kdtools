@@ -51,7 +51,7 @@ Jacob Richardson (github.com/jarichardson)
 	are not found (off the grid if the grid is too small), they will not
 	be included in the dictionary.
 		
-**densityToRaster**(griddata,range,gridRes,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm")
+**densityToRaster**(griddata,gridRange,gridRes,outrastername,clon=-999,utmzone=-999,planet='earth',driver='GTiff',outproj="tm")
 	
 	Outputs a 2-D array to a gdal-readable raster. Input expected to be
 	in a transverse mercator projection.
